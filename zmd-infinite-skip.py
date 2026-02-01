@@ -15,7 +15,7 @@ from time import sleep
 from pynput import keyboard, mouse
 import pyautogui
 
-CONFIG_FILE = "zmd-fly.toml"
+CONFIG_FILE = "zmd-infinite-skip.toml"
 DEFAULT_CONFIG = {
     "start_keys": [
         "space",
@@ -37,7 +37,17 @@ DEFAULT_CONFIG = {
 }
 
 
-def fly_loop(delays: dict[str, float], stop_event: Event):
+def skip_loop(delays: dict[str, float], stop_event: Event):
+    """
+    执行无限跳跃循环。
+    
+    通过模拟鼠标左键、R键和ESC键的按下/释放操作来实现游戏中的无限跳跃。
+    循环会持续执行直到 stop_event 被设置。
+    
+    Args:
+        delays: 包含各阶段延迟时间的字典
+        stop_event: 线程停止事件，当被设置时循环终止
+    """
     duration_1 = delays.get("duration_1", DEFAULT_CONFIG["delays"]["duration_1"])
     delay_1 = delays.get("delay_1", DEFAULT_CONFIG["delays"]["delay_1"])
     duration_2 = delays.get("duration_2", DEFAULT_CONFIG["delays"]["duration_2"])
@@ -69,6 +79,16 @@ def fly_loop(delays: dict[str, float], stop_event: Event):
 
 
 def put_loop(delays: dict[str, float], stop_event: Event):
+    """
+    执行连点放置建筑循环。
+    
+    先按Tab和1键切换到建筑模式，然后持续点击鼠标左键放置建筑。
+    循环会持续执行直到 stop_event 被设置。
+    
+    Args:
+        delays: 包含放置延迟时间的字典
+        stop_event: 线程停止事件，当被设置时循环终止
+    """
     put_duration = delays.get("put_duration", DEFAULT_CONFIG["delays"]["put_duration"])
     put_delay = delays.get("put_delay", DEFAULT_CONFIG["delays"]["put_delay"])
     pyautogui.press(keys="tab")
@@ -88,6 +108,17 @@ def start_check(
     start_key_list: list[str],
     start_event: Event,
 ):
+    """
+    检查是否按下了开始键。
+    
+    根据按键事件判断是否按下了配置的开始键，如果是则设置开始事件。
+    
+    Args:
+        key: 键盘按键或鼠标按钮对象
+        pressed: 按键是否被按下（True表示按下，False表示释放）
+        start_key_list: 开始键列表
+        start_event: 开始事件，当检测到开始键时被设置
+    """
     if hasattr(key, "name") and key.name in start_key_list:
         start_event.set()
     elif hasattr(key, "char") and key.char in start_key_list:
@@ -102,6 +133,17 @@ def stop_check(
     next_key_list: list[str],
     stop_event: Event,
 ):
+    """
+    检查是否按下了停止/下一步键。
+    
+    根据按键事件判断是否按下了配置的下一步键，如果是则设置停止事件。
+    
+    Args:
+        key: 键盘按键或鼠标按钮对象
+        pressed: 按键是否被按下（True表示按下，False表示释放）
+        next_key_list: 下一步键列表
+        stop_event: 停止事件，当检测到下一步键时被设置
+    """
     if hasattr(key, "name") and key.name in next_key_list:
         stop_event.set()
     elif hasattr(key, "char") and key.char in next_key_list:
@@ -111,6 +153,19 @@ def stop_check(
 
 
 def wait_start(delays: dict[str, float], start_key_list: list[str]):
+    """
+    等待开始按键。
+    
+    启动键盘和鼠标监听器，等待用户按下配置的开始键。
+    检测到开始键后，等待指定的开始延迟，然后返回。
+    
+    Args:
+        delays: 包含延迟时间的字典
+        start_key_list: 开始键列表
+    
+    Raises:
+        KeyboardInterrupt: 当用户按下Ctrl+C时抛出
+    """
     start_event = Event()
     keyboard_start_listener = keyboard.Listener(
         on_press=lambda key: start_check(key, True, start_key_list, start_event),
@@ -140,10 +195,22 @@ def wait_start(delays: dict[str, float], start_key_list: list[str]):
         raise e
 
 
-def main_loop(delays: dict[str, float], next_key_list: list[str]) -> bool:
+def infinite_skip(delays: dict[str, float], next_key_list: list[str]) -> bool:
+    """
+    主循环，执行无限跳跃。
+    
+    启动无限跳跃线程和键盘鼠标监听器，等待用户按下下一步键或Ctrl+C。
+    
+    Args:
+        delays: 包含延迟时间的字典
+        next_key_list: 下一步键列表
+    
+    Returns:
+        bool: 是否正常结束（True表示正常结束，False表示被中断）
+    """
     stop_event = Event()
     fly_thread = Thread(
-        target=fly_loop,
+        target=skip_loop,
         args=(
             delays,
             stop_event,
@@ -187,6 +254,15 @@ def main_loop(delays: dict[str, float], next_key_list: list[str]) -> bool:
 
 
 def put_building(delays: dict[str, float], next_key_list: list[str]):
+    """
+    放置建筑功能。
+    
+    启动连点放置建筑线程和键盘鼠标监听器，等待用户按下下一步键或Ctrl+C。
+    
+    Args:
+        delays: 包含延迟时间的字典
+        next_key_list: 下一步键列表
+    """
     stop_event = Event()
     put_thread = Thread(
         target=put_loop,
@@ -231,6 +307,15 @@ def put_building(delays: dict[str, float], next_key_list: list[str]):
 
 
 def read_config() -> dict[str, dict[str, float | str]]:
+    """
+    读取配置文件。
+    
+    如果配置文件不存在，则返回默认配置。
+    如果配置文件存在，则读取并检查配置完整性。
+    
+    Returns:
+        dict: 完整的配置字典
+    """
     if not Path(CONFIG_FILE).exists():
         return DEFAULT_CONFIG
     with open(CONFIG_FILE, "r", encoding="utf-8") as f:
@@ -241,6 +326,17 @@ def read_config() -> dict[str, dict[str, float | str]]:
 def update_delays(
     config: dict[str, dict[str, float]],
 ) -> dict[str, dict[str, float | str]]:
+    """
+    更新延迟配置。
+    
+    检查配置文件是否有更新，如果有则更新配置中的延迟参数。
+    
+    Args:
+        config: 当前配置字典
+    
+    Returns:
+        dict: 更新后的配置字典
+    """
     if not Path(CONFIG_FILE).exists():
         return
     with open(CONFIG_FILE, "r", encoding="utf-8") as f:
@@ -251,11 +347,28 @@ def update_delays(
 
 
 def save_config(config: dict[str, dict[str, float | str]]):
+    """
+    保存配置文件。
+    
+    Args:
+        config: 配置字典
+    """
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
         dump(config, f)
 
 
 def check_config(config):
+    """
+    检查并补全配置。
+    
+    确保配置字典中包含所有必要的键，缺失的键使用默认值填充。
+    
+    Args:
+        config: 待检查的配置字典
+    
+    Returns:
+        dict: 完整的配置字典
+    """
     if not config.get("start_keys"):
         config["start_keys"] = DEFAULT_CONFIG.get("start_keys")
     if not config.get("next_keys"):
@@ -285,6 +398,12 @@ def check_config(config):
 
 
 def print_help(config: dict[str, dict[str, float | str]]):
+    """
+    打印帮助信息。
+    
+    Args:
+        config: 配置字典
+    """
     print(f"本脚本用于终末地无限跳\n")
     print(f"请确保当前位于探索模式，索道位于1号位。")
     print(f"默认延迟参数不可用，请自行调整配置文件")
@@ -294,6 +413,13 @@ def print_help(config: dict[str, dict[str, float | str]]):
 
 
 def main() -> None:
+    """
+    主函数。
+    
+    程序入口点，负责读取配置、打印帮助信息，并进入主循环。
+    主循环包括等待开始、执行无限跳跃、放置建筑等步骤。
+    支持通过Ctrl+C优雅退出并保存配置。
+    """
     config = read_config()
     print_help(config)
     try:
@@ -301,7 +427,7 @@ def main() -> None:
             print("")
             update_delays(config)
             wait_start(config.get("delays"), config.get("start_keys"))
-            if main_loop(config.get("delays"), config.get("next_keys")):
+            if infinite_skip(config.get("delays"), config.get("next_keys")):
                 put_building(config.get("delays"), config.get("next_keys"))
     except KeyboardInterrupt:
         save_config(config)
