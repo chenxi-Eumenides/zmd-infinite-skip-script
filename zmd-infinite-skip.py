@@ -25,12 +25,12 @@ DEFAULT_CONFIG = {
     ],
     "delays": {
         "start_delay": 0.1,
-        "duration_1": 0.02,
-        "delay_1": 0.08,
-        "duration_2": 0.02,
-        "delay_2": 0.06,
-        "duration_3": 0.02,
-        "delay_3": 0.06,
+        "duration_attack": 0.02,
+        "delay_attack": 0.08,
+        "duration_R": 0.02,
+        "delay_R": 0.06,
+        "duration_ESC": 0.02,
+        "delay_ESC": 0.06,
         "put_duration": 0.02,
         "put_delay": 0.02,
     },
@@ -48,33 +48,33 @@ def skip_loop(delays: dict[str, float], stop_event: Event):
         delays: 包含各阶段延迟时间的字典
         stop_event: 线程停止事件，当被设置时循环终止
     """
-    duration_1 = delays.get("duration_1", DEFAULT_CONFIG["delays"]["duration_1"])
-    delay_1 = delays.get("delay_1", DEFAULT_CONFIG["delays"]["delay_1"])
-    duration_2 = delays.get("duration_2", DEFAULT_CONFIG["delays"]["duration_2"])
-    delay_2 = delays.get("delay_2", DEFAULT_CONFIG["delays"]["delay_2"])
-    duration_3 = delays.get("duration_3", DEFAULT_CONFIG["delays"]["duration_3"])
-    delay_3 = delays.get("delay_3", DEFAULT_CONFIG["delays"]["delay_3"])
+    duration_attack = delays.get("duration_attack", DEFAULT_CONFIG["delays"]["duration_attack"])
+    delay_attack = delays.get("delay_attack", DEFAULT_CONFIG["delays"]["delay_attack"])
+    duration_R = delays.get("duration_R", DEFAULT_CONFIG["delays"]["duration_R"])
+    delay_R = delays.get("delay_R", DEFAULT_CONFIG["delays"]["delay_R"])
+    duration_ESC = delays.get("duration_ESC", DEFAULT_CONFIG["delays"]["duration_ESC"])
+    delay_ESC = delays.get("delay_ESC", DEFAULT_CONFIG["delays"]["delay_ESC"])
     while not stop_event.is_set():
         # 左键
         pyautogui.mouseDown(button="left")
-        if stop_event.wait(timeout=duration_1):
+        if stop_event.wait(timeout=duration_attack):
             break
         pyautogui.mouseUp(button="left")
-        if stop_event.wait(timeout=delay_1):
+        if stop_event.wait(timeout=delay_attack):
             break
         # r键
         pyautogui.keyDown("r")
-        if stop_event.wait(timeout=duration_2):
+        if stop_event.wait(timeout=duration_R):
             break
         pyautogui.keyUp("r")
-        if stop_event.wait(timeout=delay_2):
+        if stop_event.wait(timeout=delay_R):
             break
         # esc键
         pyautogui.keyDown("esc")
-        if stop_event.wait(timeout=duration_3):
+        if stop_event.wait(timeout=duration_ESC):
             break
         pyautogui.keyUp("esc")
-        if stop_event.wait(timeout=delay_3):
+        if stop_event.wait(timeout=delay_ESC):
             break
 
 
@@ -306,6 +306,10 @@ def put_building(delays: dict[str, float], next_key_list: list[str]):
         # raise e
 
 
+def reset_mouse():
+    pyautogui.mouseUp(button="left")
+
+
 def read_config() -> dict[str, dict[str, float | str]]:
     """
     读取配置文件。
@@ -317,6 +321,7 @@ def read_config() -> dict[str, dict[str, float | str]]:
         dict: 完整的配置字典
     """
     if not Path(CONFIG_FILE).exists():
+        save_config(DEFAULT_CONFIG)
         return DEFAULT_CONFIG
     with open(CONFIG_FILE, "r", encoding="utf-8") as f:
         config = load(f)
@@ -378,18 +383,18 @@ def check_config(config):
     else:
         if not config["delays"].get("start_delay"):
             config["delays"]["start_delay"] = DEFAULT_CONFIG["delays"]["start_delay"]
-        if not config["delays"].get("delay_1"):
-            config["delays"]["delay_1"] = DEFAULT_CONFIG["delays"]["delay_1"]
-        if not config["delays"].get("duration_1"):
-            config["delays"]["duration_1"] = DEFAULT_CONFIG["delays"]["duration_1"]
-        if not config["delays"].get("delay_2"):
-            config["delays"]["delay_2"] = DEFAULT_CONFIG["delays"]["delay_2"]
-        if not config["delays"].get("duration_2"):
-            config["delays"]["duration_2"] = DEFAULT_CONFIG["delays"]["duration_2"]
-        if not config["delays"].get("delay_3"):
-            config["delays"]["delay_3"] = DEFAULT_CONFIG["delays"]["delay_3"]
-        if not config["delays"].get("duration_3"):
-            config["delays"]["duration_3"] = DEFAULT_CONFIG["delays"]["duration_3"]
+        if not config["delays"].get("delay_attack"):
+            config["delays"]["delay_attack"] = DEFAULT_CONFIG["delays"]["delay_attack"]
+        if not config["delays"].get("duration_attack"):
+            config["delays"]["duration_attack"] = DEFAULT_CONFIG["delays"]["duration_attack"]
+        if not config["delays"].get("delay_R"):
+            config["delays"]["delay_R"] = DEFAULT_CONFIG["delays"]["delay_R"]
+        if not config["delays"].get("duration_R"):
+            config["delays"]["duration_R"] = DEFAULT_CONFIG["delays"]["duration_R"]
+        if not config["delays"].get("delay_ESC"):
+            config["delays"]["delay_ESC"] = DEFAULT_CONFIG["delays"]["delay_ESC"]
+        if not config["delays"].get("duration_ESC"):
+            config["delays"]["duration_ESC"] = DEFAULT_CONFIG["delays"]["duration_ESC"]
         if not config["delays"].get("put_duration"):
             config["delays"]["put_duration"] = DEFAULT_CONFIG["delays"]["put_duration"]
         if not config["delays"].get("put_delay"):
@@ -404,12 +409,16 @@ def print_help(config: dict[str, dict[str, float | str]]):
     Args:
         config: 配置字典
     """
-    print(f"本脚本用于终末地无限跳\n")
+    print(f"本脚本用于终末地无限跳")
+    print(f"")
+    print(f"！！注意！！默认延迟参数不可用，请自行调整配置文件")
+    print(f"")
     print(f"请确保当前位于探索模式，索道位于1号位。")
-    print(f"默认延迟参数不可用，请自行调整配置文件")
     print(f"开始按键 : {[key for key in config.get('start_keys')]}")
     print(f"下一步按键 : {[key for key in config.get('next_keys')]}")
     print(f"'m_' 开头的按键为鼠标按键")
+    print(f"")
+    print(f"延迟配置每次循环前会热更新，方便调试。")
 
 
 def main() -> None:
@@ -429,7 +438,9 @@ def main() -> None:
             wait_start(config.get("delays"), config.get("start_keys"))
             if infinite_skip(config.get("delays"), config.get("next_keys")):
                 put_building(config.get("delays"), config.get("next_keys"))
+            reset_mouse()
     except KeyboardInterrupt:
+        reset_mouse()
         save_config(config)
         print("\n保存配置文件并退出")
     except Exception as e:
