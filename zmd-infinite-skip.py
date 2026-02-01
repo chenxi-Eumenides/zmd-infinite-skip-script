@@ -123,9 +123,9 @@ def put_loop(delays: dict[str, float], stop_event: Event):
     sleep(put_delay)
     while not stop_event.is_set():
         pyautogui.mouseDown(button="left")
-        sleep(0.02)
+        # sleep(0.02)
         pyautogui.mouseUp(button="left")
-        if stop_event.wait(timeout=0.05):
+        if stop_event.wait(timeout=0.02):
             break
 
 
@@ -373,8 +373,11 @@ def update_delays(
         return config
     with open(CONFIG_FILE, "r", encoding="utf-8") as f:
         new_config = load(f)
-    if config.get("delays").get("default") != new_config.get("delays").get("default"):
-        config["delays"]["default"] = new_config.get("delays").get("default")
+    for name, delays in new_config.get("delays").items():
+        if name not in config.get("delays").keys():
+            config["delays"][name] = delays
+        elif config.get("delays").get(name) != delays:
+            config["delays"][name] = delays
     return check_config(config)
 
 
