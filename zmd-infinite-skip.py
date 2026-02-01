@@ -24,15 +24,39 @@ DEFAULT_CONFIG = {
         "m_right",
     ],
     "delays": {
-        "start_delay": 0.4,
-        "duration_attack": 0.05,
-        "delay_attack": 0.18,
-        "duration_R": 0.05,
-        "delay_R": 0.19,
-        "duration_ESC": 0.05,
-        "delay_ESC": 0.15,
-        "put_duration": 0.05,
-        "put_delay": 0.05,
+        "default": {
+            "start_delay": 0.4,
+            "duration_attack": 0.05,
+            "delay_attack": 0.19,
+            "duration_R": 0.05,
+            "delay_R": 0.19,
+            "duration_ESC": 0.05,
+            "delay_ESC": 0.15,
+            "put_duration": 0.05,
+            "put_delay": 0.05,
+        },
+        "大潘": {
+            "start_delay": 0.4,
+            "duration_attack": 0.05,
+            "delay_attack": 0.18,
+            "duration_R": 0.05,
+            "delay_R": 0.19,
+            "duration_ESC": 0.05,
+            "delay_ESC": 0.15,
+            "put_duration": 0.05,
+            "put_delay": 0.05,
+        },
+        "莱万汀": {
+            "start_delay": 0.4,
+            "duration_attack": 0.02,
+            "delay_attack": 0.32,
+            "duration_R": 0.02,
+            "delay_R": 0.23,
+            "duration_ESC": 0.02,
+            "delay_ESC": 0.12,
+            "put_duration": 0.02,
+            "put_delay": 0.2,
+        },
     },
 }
 pyautogui.PAUSE = 0.002
@@ -49,16 +73,17 @@ def skip_loop(delays: dict[str, float], stop_event: Event):
         delays: 包含各阶段延迟时间的字典
         stop_event: 线程停止事件，当被设置时循环终止
     """
+    default_delays = DEFAULT_CONFIG.get("delays").get("default")
     duration_attack = delays.get(
-        "duration_attack", DEFAULT_CONFIG["delays"]["duration_attack"]
+        "duration_attack", default_delays["duration_attack"]
     )
-    delay_attack = delays.get("delay_attack", DEFAULT_CONFIG["delays"]["delay_attack"])
-    duration_R = delays.get("duration_R", DEFAULT_CONFIG["delays"]["duration_R"])
-    delay_R = delays.get("delay_R", DEFAULT_CONFIG["delays"]["delay_R"])
-    duration_ESC = delays.get("duration_ESC", DEFAULT_CONFIG["delays"]["duration_ESC"])
-    delay_ESC = delays.get("delay_ESC", DEFAULT_CONFIG["delays"]["delay_ESC"])
+    delay_attack = delays.get("delay_attack", default_delays["delay_attack"])
+    duration_R = delays.get("duration_R", default_delays["duration_R"])
+    delay_R = delays.get("delay_R", default_delays["delay_R"])
+    duration_ESC = delays.get("duration_ESC", default_delays["duration_ESC"])
+    delay_ESC = delays.get("delay_ESC", default_delays["delay_ESC"])
 
-    sleep(delays.get("start_delay", DEFAULT_CONFIG["delays"]["start_delay"]))
+    sleep(delays.get("start_delay", default_delays["start_delay"]))
     while not stop_event.is_set():
         # 左键r
         pyautogui.mouseDown(button="left")
@@ -89,17 +114,18 @@ def put_loop(delays: dict[str, float], stop_event: Event):
         delays: 包含放置延迟时间的字典
         stop_event: 线程停止事件，当被设置时循环终止
     """
-    put_duration = delays.get("put_duration", DEFAULT_CONFIG["delays"]["put_duration"])
-    put_delay = delays.get("put_delay", DEFAULT_CONFIG["delays"]["put_delay"])
-    pyautogui.press(keys="tab")
-    sleep(0.1)
-    pyautogui.press(keys="1")
-    sleep(0.1)
+    default_delays = DEFAULT_CONFIG.get("delays").get("default")
+    put_duration = delays.get("put_duration", default_delays["put_duration"])
+    put_delay = delays.get("put_delay", default_delays["put_delay"])
+    pyautogui.keyDown(key="1")
+    sleep(put_duration)
+    pyautogui.keyUp(key="1")
+    sleep(put_delay)
     while not stop_event.is_set():
         pyautogui.mouseDown(button="left")
-        sleep(put_duration)
+        sleep(0.02)
         pyautogui.mouseUp(button="left")
-        if stop_event.wait(timeout=put_delay):
+        if stop_event.wait(timeout=0.05):
             break
 
 
@@ -308,7 +334,7 @@ def put_building(delays: dict[str, float], next_key_list: list[str]):
 
 def reset_control():
     pyautogui.mouseUp(button="left")
-    pyautogui.press(keys="tab")
+    # pyautogui.press(keys="tab")
 
 
 def read_config() -> dict[str, dict[str, float | str]]:
@@ -347,8 +373,8 @@ def update_delays(
         return config
     with open(CONFIG_FILE, "r", encoding="utf-8") as f:
         new_config = load(f)
-    if config.get("delays") != new_config.get("delays"):
-        config["delays"] = new_config.get("delays")
+    if config.get("delays").get("default") != new_config.get("delays").get("default"):
+        config["delays"]["default"] = new_config.get("delays").get("default")
     return check_config(config)
 
 
@@ -381,27 +407,16 @@ def check_config(config):
         config["next_keys"] = DEFAULT_CONFIG.get("next_keys")
     if not config.get("delays"):
         config["delays"] = DEFAULT_CONFIG.get("delays")
-    else:
-        if config["delays"].get("start_delay") is None:
-            config["delays"]["start_delay"] = DEFAULT_CONFIG["delays"]["start_delay"]
-        if config["delays"].get("delay_attack") is None:
-            config["delays"]["delay_attack"] = DEFAULT_CONFIG["delays"]["delay_attack"]
-        if config["delays"].get("duration_attack") is None:
-            config["delays"]["duration_attack"] = DEFAULT_CONFIG["delays"][
-                "duration_attack"
-            ]
-        if config["delays"].get("delay_R") is None:
-            config["delays"]["delay_R"] = DEFAULT_CONFIG["delays"]["delay_R"]
-        if config["delays"].get("duration_R") is None:
-            config["delays"]["duration_R"] = DEFAULT_CONFIG["delays"]["duration_R"]
-        if config["delays"].get("delay_ESC") is None:
-            config["delays"]["delay_ESC"] = DEFAULT_CONFIG["delays"]["delay_ESC"]
-        if config["delays"].get("duration_ESC") is None:
-            config["delays"]["duration_ESC"] = DEFAULT_CONFIG["delays"]["duration_ESC"]
-        if config["delays"].get("put_duration") is None:
-            config["delays"]["put_duration"] = DEFAULT_CONFIG["delays"]["put_duration"]
-        if config["delays"].get("put_delay") is None:
-            config["delays"]["put_delay"] = DEFAULT_CONFIG["delays"]["put_delay"]
+    all_delays: dict[str, dict[str, float]] = config.get("delays")
+    delays_keys = DEFAULT_CONFIG.get("delays").get("default").keys()
+    for name, delays in all_delays.items():
+        if name not in DEFAULT_CONFIG.get("delays").keys():
+            name = "default"
+            # 预设延迟
+        name_delays = DEFAULT_CONFIG.get("delays").get(name)
+        for key in delays_keys:
+            if delays.get(key) is None:
+                delays[key] = name_delays.get(key)
     return config
 
 
@@ -414,13 +429,33 @@ def print_help(config: dict[str, dict[str, float | str]]):
     """
     print(f"本脚本用于终末地无限跳")
     print(f"")
-    print(f"请确保当前位于探索模式，索道位于1号位。")
-    print(f"默认参数为大潘，其他干员请自行调整配置文件")
-    print(f"延迟配置每次循环前会热更新")
+    print(f"请确保当前位于工业模式，索道位于1号位。")
+    print(f"当前已选择延迟配置保持热更新，更换干员配置需重启选择")
     print(f"")
     print(f"开始按键 : {[key for key in config.get('start_keys')]}")
     print(f"下一步按键 : {[key for key in config.get('next_keys')]}")
     print(f"'m_' 开头的按键为鼠标按键")
+
+
+def choose_delay(
+    config: dict[str, dict[str, float | str]],
+) -> str:
+    delay_names = list(config.get("delays").keys())
+    print(f"")
+    print(f"当前已有配置：")
+    for i, name in enumerate(delay_names):
+        print(f"{i}. {name}")
+    try:
+        choose = int(input(f"请选择延迟配置（输入序号）："))
+        choose = delay_names[choose]
+    except Exception as e:
+        print(f"输入错误：{e}")
+        choose = "default"
+    print(f"已选择 {choose}")
+    delays = config.get("delays").get(choose)
+    for key, value in delays.items():
+        print(f"{key}: {value}")
+    return choose
 
 
 def main() -> None:
@@ -429,17 +464,19 @@ def main() -> None:
 
     程序入口点，负责读取配置、打印帮助信息，并进入主循环。
     主循环包括等待开始、执行无限跳跃、放置建筑等步骤。
-    支持通过Ctrl+C优雅退出并保存配置。
+    支持通过 Ctrl+C 退出并保存配置。
     """
     config = read_config()
     print_help(config)
     try:
+        choose = choose_delay(config)
         while True:
             print("")
             wait_start(config.get("start_keys"))
             update_delays(config)
-            if infinite_skip(config.get("delays"), config.get("next_keys")):
-                put_building(config.get("delays"), config.get("next_keys"))
+            delays = config.get("delays").get(choose)
+            if infinite_skip(delays, config.get("next_keys")):
+                put_building(delays, config.get("next_keys"))
             reset_control()
     except KeyboardInterrupt:
         reset_control()
