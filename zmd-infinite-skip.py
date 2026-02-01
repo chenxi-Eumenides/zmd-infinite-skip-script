@@ -33,7 +33,7 @@ DEFAULT_CONFIG = {
             "duration_ESC": 0.05,
             "delay_ESC": 0.15,
             "put_duration": 0.05,
-            "put_delay": 0.05,
+            "put_delay": 0.5,
         },
         "大潘": {
             "start_delay": 0.4,
@@ -43,8 +43,8 @@ DEFAULT_CONFIG = {
             "delay_R": 0.19,
             "duration_ESC": 0.05,
             "delay_ESC": 0.15,
-            "put_duration": 0.05,
-            "put_delay": 0.05,
+            "put_duration": 0.02,
+            "put_delay": 0.4,
         },
         "莱万汀": {
             "start_delay": 0.4,
@@ -55,7 +55,7 @@ DEFAULT_CONFIG = {
             "duration_ESC": 0.02,
             "delay_ESC": 0.12,
             "put_duration": 0.02,
-            "put_delay": 0.2,
+            "put_delay": 0.4,
         },
     },
 }
