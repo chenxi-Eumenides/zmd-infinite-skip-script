@@ -24,17 +24,18 @@ DEFAULT_CONFIG = {
         "m_right",
     ],
     "delays": {
-        "start_delay": 0.1,
-        "duration_attack": 0.02,
-        "delay_attack": 0.08,
-        "duration_R": 0.02,
-        "delay_R": 0.06,
-        "duration_ESC": 0.02,
-        "delay_ESC": 0.06,
-        "put_duration": 0.02,
-        "put_delay": 0.02,
+        "start_delay": 0.4,
+        "duration_attack": 0.05,
+        "delay_attack": 0.18,
+        "duration_R": 0.05,
+        "delay_R": 0.19,
+        "duration_ESC": 0.05,
+        "delay_ESC": 0.15,
+        "put_duration": 0.05,
+        "put_delay": 0.05,
     },
 }
+pyautogui.PAUSE = 0.002
 
 
 def skip_loop(delays: dict[str, float], stop_event: Event):
@@ -59,24 +60,19 @@ def skip_loop(delays: dict[str, float], stop_event: Event):
 
     sleep(delays.get("start_delay", DEFAULT_CONFIG["delays"]["start_delay"]))
     while not stop_event.is_set():
-        # 左键
+        # 左键r
         pyautogui.mouseDown(button="left")
-        if stop_event.wait(timeout=duration_attack):
-            break
+        sleep(duration_attack)
         pyautogui.mouseUp(button="left")
-        if stop_event.wait(timeout=delay_attack):
-            break
+        sleep(delay_attack)
         # r键
         pyautogui.keyDown("r")
-        if stop_event.wait(timeout=duration_R):
-            break
+        sleep(duration_R)
         pyautogui.keyUp("r")
-        if stop_event.wait(timeout=delay_R):
-            break
+        sleep(delay_R)
         # esc键
         pyautogui.keyDown("esc")
-        if stop_event.wait(timeout=duration_ESC):
-            break
+        sleep(duration_ESC)
         pyautogui.keyUp("esc")
         if stop_event.wait(timeout=delay_ESC):
             break
@@ -96,11 +92,12 @@ def put_loop(delays: dict[str, float], stop_event: Event):
     put_duration = delays.get("put_duration", DEFAULT_CONFIG["delays"]["put_duration"])
     put_delay = delays.get("put_delay", DEFAULT_CONFIG["delays"]["put_delay"])
     pyautogui.press(keys="tab")
+    sleep(0.1)
     pyautogui.press(keys="1")
+    sleep(0.1)
     while not stop_event.is_set():
         pyautogui.mouseDown(button="left")
-        if stop_event.wait(timeout=put_duration):
-            break
+        sleep(put_duration)
         pyautogui.mouseUp(button="left")
         if stop_event.wait(timeout=put_delay):
             break
@@ -417,14 +414,13 @@ def print_help(config: dict[str, dict[str, float | str]]):
     """
     print(f"本脚本用于终末地无限跳")
     print(f"")
-    print(f"！！注意！！默认延迟参数不可用，请自行调整配置文件")
-    print(f"")
     print(f"请确保当前位于探索模式，索道位于1号位。")
+    print(f"默认参数为大潘，其他干员请自行调整配置文件")
+    print(f"延迟配置每次循环前会热更新")
+    print(f"")
     print(f"开始按键 : {[key for key in config.get('start_keys')]}")
     print(f"下一步按键 : {[key for key in config.get('next_keys')]}")
     print(f"'m_' 开头的按键为鼠标按键")
-    print(f"")
-    print(f"延迟配置每次循环前会热更新，方便调试。")
 
 
 def main() -> None:
