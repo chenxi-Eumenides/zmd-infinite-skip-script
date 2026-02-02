@@ -7,10 +7,13 @@
 # ]
 # ///
 
+# TODO
+# 1. 支持组合键触发
+
 from threading import Event, Thread
 from toml import load, dump
 from pathlib import Path
-from time import sleep
+from time import sleep, time
 
 from pynput import keyboard, mouse
 import pyautogui
@@ -23,25 +26,28 @@ DEFAULT_CONFIG = {
     "next_keys": [
         "m_right",
     ],
+    "end_keys": [
+        "shift",
+    ],
     "delays": {
         "default": {
             "start_delay": 0.4,
-            "duration_attack": 0.05,
-            "delay_attack": 0.19,
-            "duration_R": 0.05,
-            "delay_R": 0.19,
-            "duration_ESC": 0.05,
-            "delay_ESC": 0.15,
-            "put_duration": 0.05,
-            "put_delay": 0.5,
+            "duration_attack": 0.02,
+            "delay_attack": 0.2,
+            "duration_R": 0.02,
+            "delay_R": 0.2,
+            "duration_ESC": 0.02,
+            "delay_ESC": 0.2,
+            "put_duration": 0.02,
+            "put_delay": 0.4,
         },
         "大潘": {
             "start_delay": 0.4,
-            "duration_attack": 0.05,
+            "duration_attack": 0.02,
             "delay_attack": 0.18,
-            "duration_R": 0.05,
+            "duration_R": 0.02,
             "delay_R": 0.19,
-            "duration_ESC": 0.05,
+            "duration_ESC": 0.02,
             "delay_ESC": 0.15,
             "put_duration": 0.02,
             "put_delay": 0.4,
@@ -62,7 +68,7 @@ DEFAULT_CONFIG = {
 pyautogui.PAUSE = 0.002
 
 
-def skip_loop(delays: dict[str, float], stop_event: Event):
+def skip_loop(delays: dict[str, float], stop_event: Event, end_event: Event):
     """
     执行无限跳跃循环。
 
@@ -74,9 +80,7 @@ def skip_loop(delays: dict[str, float], stop_event: Event):
         stop_event: 线程停止事件，当被设置时循环终止
     """
     default_delays = DEFAULT_CONFIG.get("delays").get("default")
-    duration_attack = delays.get(
-        "duration_attack", default_delays["duration_attack"]
-    )
+    duration_attack = delays.get("duration_attack", default_delays["duration_attack"])
     delay_attack = delays.get("delay_attack", default_delays["delay_attack"])
     duration_R = delays.get("duration_R", default_delays["duration_R"])
     delay_R = delays.get("delay_R", default_delays["delay_R"])
@@ -84,7 +88,7 @@ def skip_loop(delays: dict[str, float], stop_event: Event):
     delay_ESC = delays.get("delay_ESC", default_delays["delay_ESC"])
 
     sleep(delays.get("start_delay", default_delays["start_delay"]))
-    while not stop_event.is_set():
+    while not stop_event.is_set() and not end_event.is_set():
         # 左键r
         pyautogui.mouseDown(button="left")
         sleep(duration_attack)
@@ -103,7 +107,7 @@ def skip_loop(delays: dict[str, float], stop_event: Event):
             break
 
 
-def put_loop(delays: dict[str, float], stop_event: Event):
+def put_loop(delays: dict[str, float], stop_event: Event, end_event: Event):
     """
     执行连点放置建筑循环。
 
@@ -118,15 +122,18 @@ def put_loop(delays: dict[str, float], stop_event: Event):
     put_duration = delays.get("put_duration", default_delays["put_duration"])
     put_delay = delays.get("put_delay", default_delays["put_delay"])
     pyautogui.keyDown(key="1")
-    sleep(put_duration)
+    sleep(0.02)
     pyautogui.keyUp(key="1")
+    sleep(0.02)
+    pyautogui.keyDown(key="alt")
     sleep(put_delay)
-    while not stop_event.is_set():
+    while not stop_event.is_set() and not end_event.is_set():
         pyautogui.mouseDown(button="left")
-        # sleep(0.02)
+        sleep(0.005)
         pyautogui.mouseUp(button="left")
         if stop_event.wait(timeout=0.02):
             break
+    pyautogui.keyUp(key="alt")
 
 
 def start_check(
@@ -134,6 +141,8 @@ def start_check(
     pressed: bool,
     start_key_list: list[str],
     start_event: Event,
+    end_key_list: list[str] = None,
+    end_event: Event = None,
 ):
     """
     检查是否按下了开始键。
@@ -152,6 +161,13 @@ def start_check(
         start_event.set()
     elif hasattr(key, "name") and "m_" + key.name in start_key_list and pressed:
         start_event.set()
+    if end_key_list is not None and end_event is not None:
+        if hasattr(key, "name") and key.name in end_key_list:
+            end_event.set()
+        elif hasattr(key, "char") and key.char in end_key_list:
+            end_event.set()
+        elif hasattr(key, "name") and "m_" + key.name in end_key_list and pressed:
+            end_event.set()
 
 
 def stop_check(
@@ -159,6 +175,8 @@ def stop_check(
     pressed: bool,
     next_key_list: list[str],
     stop_event: Event,
+    end_key_list: list[str] = None,
+    end_event: Event = None,
 ):
     """
     检查是否按下了停止/下一步键。
@@ -177,6 +195,13 @@ def stop_check(
         stop_event.set()
     elif hasattr(key, "name") and "m_" + key.name in next_key_list and pressed:
         stop_event.set()
+    if end_key_list is not None and end_event is not None:
+        if hasattr(key, "name") and key.name in end_key_list:
+            end_event.set()
+        elif hasattr(key, "char") and key.char in end_key_list:
+            end_event.set()
+        elif hasattr(key, "name") and "m_" + key.name in end_key_list and pressed:
+            end_event.set()
 
 
 def wait_start(start_key_list: list[str]):
@@ -195,7 +220,9 @@ def wait_start(start_key_list: list[str]):
     """
     start_event = Event()
     keyboard_start_listener = keyboard.Listener(
-        on_press=lambda key: start_check(key, True, start_key_list, start_event),
+        on_press=lambda key: start_check(
+            key, True, start_key_list, start_event
+        ),
     )
     mouse_start_listener = mouse.Listener(
         on_click=lambda x, y, button, pressed: start_check(
@@ -221,7 +248,12 @@ def wait_start(start_key_list: list[str]):
         raise e
 
 
-def infinite_skip(delays: dict[str, float], next_key_list: list[str]) -> bool:
+def infinite_skip(
+    delays: dict[str, float],
+    next_key_list: list[str],
+    end_key_list: list[str],
+    end_event: Event,
+) -> bool:
     """
     主循环，执行无限跳跃。
 
@@ -240,26 +272,29 @@ def infinite_skip(delays: dict[str, float], next_key_list: list[str]) -> bool:
         args=(
             delays,
             stop_event,
+            end_event,
         ),
     )
     keyboard_stop_listener = keyboard.Listener(
-        on_press=lambda key: stop_check(key, True, next_key_list, stop_event),
+        on_press=lambda key: stop_check(
+            key, True, next_key_list, stop_event, end_key_list, end_event
+        ),
     )
     mouse_stop_listener = mouse.Listener(
         on_click=lambda x, y, button, pressed: stop_check(
-            button, pressed, next_key_list, stop_event
+            button, pressed, next_key_list, stop_event, end_key_list, end_event
         ),
     )
     try:
         # 开始循环
         print(f"+ 开始无限跳跃")
         print(
-            f"  - 等待下一步按键{[key for key in next_key_list]}，Ctrl+C 中止当前循环"
+            f"  - 等待下一步按键{[key for key in next_key_list]}，{[key for key in end_key_list]} 中止当前循环"
         )
         skip_thread.start()
         keyboard_stop_listener.start()
         mouse_stop_listener.start()
-        while skip_thread.is_alive():
+        while skip_thread.is_alive() and not end_event.is_set():
             skip_thread.join(timeout=0.01)
         # 结束循环
         print("  - 结束无限跳跃")
@@ -275,11 +310,16 @@ def infinite_skip(delays: dict[str, float], next_key_list: list[str]) -> bool:
             keyboard_stop_listener.stop()
         if skip_thread.is_alive():
             skip_thread.join()
-        # raise e
+        raise e
         return False
 
 
-def put_building(delays: dict[str, float], next_key_list: list[str]):
+def put_building(
+    delays: dict[str, float],
+    next_key_list: list[str],
+    end_key_list: list[str],
+    end_event: Event,
+):
     """
     放置建筑功能。
 
@@ -295,26 +335,29 @@ def put_building(delays: dict[str, float], next_key_list: list[str]):
         args=(
             delays,
             stop_event,
+            end_event,
         ),
     )
     keyboard_stop_listener = keyboard.Listener(
-        on_press=lambda key: stop_check(key, True, next_key_list, stop_event),
+        on_press=lambda key: stop_check(
+            key, True, next_key_list, stop_event, end_key_list, end_event
+        ),
     )
     mouse_stop_listener = mouse.Listener(
         on_click=lambda x, y, button, pressed: stop_check(
-            button, pressed, next_key_list, stop_event
+            button, pressed, next_key_list, stop_event, end_key_list, end_event
         ),
     )
     try:
         # 开始循环
         print("+ 开始连点放置建筑")
         print(
-            f"  - 等待下一步按键{[key for key in next_key_list]}，Ctrl+C 中止当前循环"
+            f"  - 等待下一步按键{[key for key in next_key_list]}，{[key for key in end_key_list]} 中止当前循环"
         )
         put_thread.start()
         keyboard_stop_listener.start()
         mouse_stop_listener.start()
-        while put_thread.is_alive():
+        while put_thread.is_alive() and not end_event.is_set():
             put_thread.join(timeout=0.01)
         # 结束循环
         print("  - 结束连点放置建筑")
@@ -329,12 +372,14 @@ def put_building(delays: dict[str, float], next_key_list: list[str]):
             keyboard_stop_listener.stop()
         if put_thread.is_alive():
             put_thread.join()
-        # raise e
+        raise e
 
 
 def reset_control():
     pyautogui.mouseUp(button="left")
-    # pyautogui.press(keys="tab")
+    pyautogui.keyUp(key="esc")
+    pyautogui.keyUp(key="r")
+    pyautogui.keyUp(key="space")
 
 
 def read_config() -> dict[str, dict[str, float | str]]:
@@ -351,8 +396,9 @@ def read_config() -> dict[str, dict[str, float | str]]:
         save_config(DEFAULT_CONFIG)
         return DEFAULT_CONFIG
     with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-        config = load(f)
-    return check_config(config)
+        config = check_config(load(f))
+    save_config(config)
+    return config
 
 
 def update_delays(
@@ -408,6 +454,8 @@ def check_config(config):
         config["start_keys"] = DEFAULT_CONFIG.get("start_keys")
     if not config.get("next_keys"):
         config["next_keys"] = DEFAULT_CONFIG.get("next_keys")
+    if not config.get("next_keys"):
+        config["end_keys"] = DEFAULT_CONFIG.get("end_keys")
     if not config.get("delays"):
         config["delays"] = DEFAULT_CONFIG.get("delays")
     all_delays: dict[str, dict[str, float]] = config.get("delays")
@@ -415,11 +463,13 @@ def check_config(config):
     for name, delays in all_delays.items():
         if name not in DEFAULT_CONFIG.get("delays").keys():
             name = "default"
-            # 预设延迟
         name_delays = DEFAULT_CONFIG.get("delays").get(name)
         for key in delays_keys:
             if delays.get(key) is None:
-                delays[key] = name_delays.get(key)
+                config["delays"][name][key] = name_delays.get(key)
+    for name, delays in DEFAULT_CONFIG.get("delays").items():
+        if name not in all_delays.keys():
+            config["delays"][name] = delays
     return config
 
 
@@ -434,9 +484,6 @@ def print_help(config: dict[str, dict[str, float | str]]):
     print(f"")
     print(f"请确保当前位于工业模式，索道位于1号位。")
     print(f"当前已选择延迟配置保持热更新，更换干员配置需重启选择")
-    print(f"")
-    print(f"开始按键 : {[key for key in config.get('start_keys')]}")
-    print(f"下一步按键 : {[key for key in config.get('next_keys')]}")
     print(f"'m_' 开头的按键为鼠标按键")
 
 
@@ -467,9 +514,10 @@ def main() -> None:
 
     程序入口点，负责读取配置、打印帮助信息，并进入主循环。
     主循环包括等待开始、执行无限跳跃、放置建筑等步骤。
-    支持通过 Ctrl+C 退出并保存配置。
+    支持通过 Ctrl+C 退出。
     """
     config = read_config()
+    end_event = Event()
     print_help(config)
     try:
         choose = choose_delay(config)
@@ -478,17 +526,21 @@ def main() -> None:
             wait_start(config.get("start_keys"))
             update_delays(config)
             delays = config.get("delays").get(choose)
-            if infinite_skip(delays, config.get("next_keys")):
-                put_building(delays, config.get("next_keys"))
+            if infinite_skip(
+                delays, config.get("next_keys"), config.get("end_keys"), end_event
+            ):
+                if end_event.is_set():
+                    end_event.clear()
+                    continue
+                put_building(
+                    delays, config.get("next_keys"), config.get("end_keys"), end_event
+                )
             reset_control()
+            end_event.clear()
     except KeyboardInterrupt:
         reset_control()
-        update_delays(config)
-        save_config(config)
-        print("\n保存配置文件并退出")
     except Exception as e:
         print(f"报错：{e}")
-
 
 if __name__ == "__main__":
     main()
