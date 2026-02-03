@@ -14,11 +14,13 @@ from threading import Event, Thread
 from toml import load, dump
 from pathlib import Path
 from time import sleep, time
+import logging
 
 from pynput import keyboard, mouse
 import pyautogui
 
 CONFIG_FILE = "zmd-infinite-skip.toml"
+LOG_LEVEL = logging.DEBUG
 DEFAULT_CONFIG = {
     "start_keys": [
         "space",
@@ -29,6 +31,7 @@ DEFAULT_CONFIG = {
     "end_keys": [
         "shift",
     ],
+    "max_skip_time": 28.0,
     "delays": {
         "default": {
             "start_delay": 0.4,
@@ -66,6 +69,28 @@ DEFAULT_CONFIG = {
     },
 }
 pyautogui.PAUSE = 0.002
+start_time = time()
+logging.basicConfig(format="%(message)s", level=LOG_LEVEL)
+levelname = {
+    logging.DEBUG: "DEBUG",
+    logging.INFO: "INFO ",
+    logging.WARNING: "WARN ",
+    logging.ERROR: "ERROR",
+    logging.CRITICAL: "CRTCL",
+}
+
+
+def log(message: str, log_level: int = logging.INFO, indent: int = 0):
+    global start_time
+    global levelname
+    local_time = time() - start_time
+    message = f"{levelname.get(log_level)} {local_time:.3f}s : {' '*indent*2}{message}"
+    logging.log(log_level, message)
+
+
+def reset_start_time():
+    global start_time
+    start_time = time()
 
 
 def skip_loop(delays: dict[str, float], stop_event: Event, end_event: Event):
@@ -80,6 +105,7 @@ def skip_loop(delays: dict[str, float], stop_event: Event, end_event: Event):
         stop_event: 线程停止事件，当被设置时循环终止
     """
     default_delays = DEFAULT_CONFIG.get("delays").get("default")
+    start_delay = delays.get("start_delay", default_delays["start_delay"])
     duration_attack = delays.get("duration_attack", default_delays["duration_attack"])
     delay_attack = delays.get("delay_attack", default_delays["delay_attack"])
     duration_R = delays.get("duration_R", default_delays["duration_R"])
@@ -87,7 +113,7 @@ def skip_loop(delays: dict[str, float], stop_event: Event, end_event: Event):
     duration_ESC = delays.get("duration_ESC", default_delays["duration_ESC"])
     delay_ESC = delays.get("delay_ESC", default_delays["delay_ESC"])
 
-    sleep(delays.get("start_delay", default_delays["start_delay"]))
+    sleep(start_delay)
     while not stop_event.is_set() and not end_event.is_set():
         # 左键r
         pyautogui.mouseDown(button="left")
@@ -95,23 +121,22 @@ def skip_loop(delays: dict[str, float], stop_event: Event, end_event: Event):
         pyautogui.mouseUp(button="left")
         sleep(delay_attack)
         # r键
-        pyautogui.keyDown("r")
+        pyautogui.keyDown(key="r")
         sleep(duration_R)
-        pyautogui.keyUp("r")
+        pyautogui.keyUp(key="r")
         sleep(delay_R)
         # esc键
-        pyautogui.keyDown("esc")
+        pyautogui.keyDown(key="esc")
         sleep(duration_ESC)
-        pyautogui.keyUp("esc")
-        if stop_event.wait(timeout=delay_ESC):
-            break
+        pyautogui.keyUp(key="esc")
+        sleep(delay_ESC)
 
 
 def put_loop(delays: dict[str, float], stop_event: Event, end_event: Event):
     """
     执行连点放置建筑循环。
 
-    先按Tab和1键切换到建筑模式，然后持续点击鼠标左键放置建筑。
+    先按1键拿出建筑，然后持续点击鼠标左键放置建筑。
     循环会持续执行直到 stop_event 被设置。
 
     Args:
@@ -220,9 +245,7 @@ def wait_start(start_key_list: list[str]):
     """
     start_event = Event()
     keyboard_start_listener = keyboard.Listener(
-        on_press=lambda key: start_check(
-            key, True, start_key_list, start_event
-        ),
+        on_press=lambda key: start_check(key, True, start_key_list, start_event),
     )
     mouse_start_listener = mouse.Listener(
         on_click=lambda x, y, button, pressed: start_check(
@@ -230,7 +253,11 @@ def wait_start(start_key_list: list[str]):
         ),
     )
     # 等待跳跃键
-    print(f"+ 等待按下开始键{[key for key in start_key_list]}，Ctrl+C 结束脚本")
+    print(
+        f"\r[等待开始] 等待按下开始键{[key for key in start_key_list]}，Ctrl+C 结束脚本{' '*10}",
+        end="",
+        flush=True,
+    )
     try:
         mouse_start_listener.start()
         keyboard_start_listener.start()
@@ -250,6 +277,7 @@ def wait_start(start_key_list: list[str]):
 
 def infinite_skip(
     delays: dict[str, float],
+    max_skip_time: float,
     next_key_list: list[str],
     end_key_list: list[str],
     end_event: Event,
@@ -287,17 +315,18 @@ def infinite_skip(
     )
     try:
         # 开始循环
-        print(f"+ 开始无限跳跃")
-        print(
-            f"  - 等待下一步按键{[key for key in next_key_list]}，{[key for key in end_key_list]} 中止当前循环"
-        )
+        content = f"[无限跳跃] 等待下一步按键{[key for key in next_key_list]}，{[key for key in end_key_list]} 中止当前循环"
         skip_thread.start()
         keyboard_stop_listener.start()
         mouse_stop_listener.start()
-        while skip_thread.is_alive() and not end_event.is_set():
+        skip_time = time()
+        while (
+            skip_thread.is_alive()
+            and not end_event.is_set()
+            and (now := time() - skip_time) <= max_skip_time
+        ):
+            print(f"\r{content} ( {30-now:.1f}s )", end="", flush=True)
             skip_thread.join(timeout=0.01)
-        # 结束循环
-        print("  - 结束无限跳跃")
         stop_event.set()
         mouse_stop_listener.stop()
         keyboard_stop_listener.stop()
@@ -350,17 +379,13 @@ def put_building(
     )
     try:
         # 开始循环
-        print("+ 开始连点放置建筑")
-        print(
-            f"  - 等待下一步按键{[key for key in next_key_list]}，{[key for key in end_key_list]} 中止当前循环"
-        )
+        content = f"[放置建筑] 等待下一步按键{[key for key in next_key_list]}，{[key for key in end_key_list]} 中止当前循环{' '*10}"
         put_thread.start()
         keyboard_stop_listener.start()
         mouse_stop_listener.start()
+        print(f"\r{content}", end="", flush=True)
         while put_thread.is_alive() and not end_event.is_set():
             put_thread.join(timeout=0.01)
-        # 结束循环
-        print("  - 结束连点放置建筑")
         stop_event.set()
         mouse_stop_listener.stop()
         keyboard_stop_listener.stop()
@@ -458,6 +483,8 @@ def check_config(config):
         config["end_keys"] = DEFAULT_CONFIG.get("end_keys")
     if not config.get("delays"):
         config["delays"] = DEFAULT_CONFIG.get("delays")
+    if not config.get("max_skip_time"):
+        config["max_skip_time"] = DEFAULT_CONFIG.get("max_skip_time")
     all_delays: dict[str, dict[str, float]] = config.get("delays")
     delays_keys = DEFAULT_CONFIG.get("delays").get("default").keys()
     for name, delays in all_delays.items():
@@ -501,10 +528,11 @@ def choose_delay(
     except Exception as e:
         print(f"输入错误：{e}")
         choose = "default"
+    print(f"")
     print(f"已选择 {choose}")
     delays = config.get("delays").get(choose)
     for key, value in delays.items():
-        print(f"{key}: {value}")
+        print(f"  {key}: {value}")
     return choose
 
 
@@ -521,13 +549,17 @@ def main() -> None:
     print_help(config)
     try:
         choose = choose_delay(config)
+        print("")
         while True:
-            print("")
             wait_start(config.get("start_keys"))
             update_delays(config)
             delays = config.get("delays").get(choose)
             if infinite_skip(
-                delays, config.get("next_keys"), config.get("end_keys"), end_event
+                delays,
+                config.get("max_skip_time", 28),
+                config.get("next_keys"),
+                config.get("end_keys"),
+                end_event,
             ):
                 if end_event.is_set():
                     end_event.clear()
@@ -541,6 +573,7 @@ def main() -> None:
         reset_control()
     except Exception as e:
         print(f"报错：{e}")
+
 
 if __name__ == "__main__":
     main()
