@@ -30,6 +30,7 @@
 # m_ 开头的按键为鼠标按键
 start_keys = ["space"]          # 开始键列表
 next_keys = ["m_right"]         # 下一步键列表
+max_skip_time = 28.0            # 最大跳跃时间，最好小于30秒
 
 [delays.default]
 start_delay = 0.1               # 开始延迟（秒）
