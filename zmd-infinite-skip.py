@@ -11,12 +11,12 @@
 # 1. 支持组合键触发
 
 from threading import Event, Thread
-from toml import load, dump
 from pathlib import Path
 from time import sleep, time
 import logging
 
 from pynput import keyboard, mouse
+from toml import load, dump
 import pyautogui
 
 CONFIG_FILE = "zmd-infinite-skip.toml"
@@ -479,7 +479,7 @@ def check_config(config):
         config["start_keys"] = DEFAULT_CONFIG.get("start_keys")
     if not config.get("next_keys"):
         config["next_keys"] = DEFAULT_CONFIG.get("next_keys")
-    if not config.get("next_keys"):
+    if not config.get("end_keys"):
         config["end_keys"] = DEFAULT_CONFIG.get("end_keys")
     if not config.get("delays"):
         config["delays"] = DEFAULT_CONFIG.get("delays")
@@ -572,7 +572,7 @@ def main() -> None:
     except KeyboardInterrupt:
         reset_control()
     except Exception as e:
-        print(f"报错：{e}")
+        print(f"报错：{e.with_traceback()}")
 
 
 if __name__ == "__main__":
