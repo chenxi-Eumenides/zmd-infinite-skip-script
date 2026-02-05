@@ -1,0 +1,16 @@
+[project]
+name = "zmd-infinite-skip"
+version = "1.1.4"
+description = "终末地无限跳跃脚本"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "pyautogui>=0.9.54",
+    "pynput>=1.8.1",
+    "toml>=0.10.2",
+]
+
+[dependency-groups]
+dev = [
+    "pyinstaller>=6.18.0",
+]
